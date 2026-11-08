@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { formatTime } from './math.js?v=mw8f9zl5';
+import { formatTime } from './math.js?v=mw8fr568';
 
 const W = 1280;
 const H = 400;
@@ -8,11 +8,13 @@ const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 const REGIONS = [
   { id: 'play', x: 40, y: 36, w: 120, h: 120 },
   { id: 'track', x: 270, y: 56, w: 760, h: 80, slider: true },
-  { id: 'last', x: 40, y: 200, w: 170, h: 160 },
-  { id: 'next', x: 226, y: 200, w: 170, h: 160 },
-  { id: 'speed', x: 412, y: 200, w: 170, h: 160 },
-  { id: 'size', x: 598, y: 200, w: 476, h: 160, slider: true },
-  { id: 'exit', x: 1090, y: 200, w: 150, h: 160 },
+  { id: 'last', x: 40, y: 200, w: 140, h: 160 },
+  { id: 'next', x: 192, y: 200, w: 140, h: 160 },
+  { id: 'speed', x: 344, y: 200, w: 140, h: 160 },
+  { id: 'view', x: 496, y: 200, w: 140, h: 160 },
+  { id: 'depth', x: 648, y: 200, w: 230, h: 160, slider: true },
+  { id: 'size', x: 890, y: 200, w: 190, h: 160, slider: true },
+  { id: 'exit', x: 1092, y: 200, w: 148, h: 160 },
 ];
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -92,9 +94,11 @@ export class Bar {
       Math.floor(s.time * 4),
       Math.round(s.duration),
       s.speed,
+      Math.round(s.strength * 50),
       Math.round(s.sizeSlider * 50),
       s.index,
       s.total,
+      s.wrap ? 1 : 0,
       hover || '',
     ].join('|');
     if (key === this.key) return;
@@ -189,7 +193,9 @@ export class Bar {
     cell('last', 'Last', s.total > 1 ? `${s.index} of ${s.total}` : '');
     cell('next', 'Next', s.total > 1 ? `${s.index} of ${s.total}` : '');
     cell('speed', `${s.speed}x`, 'Speed');
-    slider('size', 'Screen size', (s.sizeSlider + 1) / 2, `${Math.round(s.size * 100)}`);
+    cell('view', s.wrap ? '180' : 'Real', 'View');
+    slider('depth', '3D', s.strength / 2, `${Math.round(s.strength * 100)}`);
+    slider('size', 'Size', (s.sizeSlider + 1) / 2, `${Math.round(s.size * 100)}`);
     cell('exit', 'Exit', '');
     this.texture.needsUpdate = true;
   }

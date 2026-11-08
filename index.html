@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Depthwalk</title>
-<meta name="description" content="Watch X videos life size in VR on Quest">
+<meta name="description" content="Watch X videos in 180 degree 3D on Quest">
 <meta name="theme-color" content="#000000">
 <meta name="referrer" content="no-referrer">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/app.css?v=mw8f9zl5">
+<link rel="stylesheet" href="css/app.css?v=mw8fr568">
 <script type="importmap">
 {
   "imports": {
@@ -17,7 +17,7 @@
   }
 }
 </script>
-<script type="module" src="js/app.js?v=mw8f9zl5"></script>
+<script type="module" src="js/app.js?v=mw8fr568"></script>
 </head>
 <body>
 <div class="app">
@@ -30,6 +30,7 @@
       </svg>
       <span>Depthwalk</span>
     </div>
+    <div class="ai" id="ai">Getting the 3D AI ready</div>
   </header>
 
   <main class="grid">
@@ -47,13 +48,14 @@
 
       <h2>Recent</h2>
       <ul class="list" id="recent"></ul>
-      <p class="note" id="recent-empty">Clips you open stay here</p>
+      <p class="note" id="recent-empty">Clips you open stay here with their 3D saved</p>
     </section>
 
     <section class="main">
       <div class="stage" id="stage">
         <canvas id="view"></canvas>
         <div class="stage-note" id="empty">Paste a link to start</div>
+        <div class="stage-hint">Drag to see the 3D</div>
       </div>
 
       <div class="controls">
@@ -67,7 +69,12 @@
           <button type="button" data-speed="0.5">0.5x</button>
           <button type="button" data-speed="0.25">0.25x</button>
         </div>
-        <label class="slider"><span>Screen size</span><input type="range" id="size" min="-1" max="1" step="0.01" value="0"></label>
+        <div class="seg" id="wrap" role="group" aria-label="View">
+          <button type="button" data-wrap="180">180</button>
+          <button type="button" data-wrap="real">Real size</button>
+        </div>
+        <label class="slider"><span>3D</span><input type="range" id="strength" min="0" max="2" step="0.01" value="1"></label>
+        <label class="slider"><span>Size</span><input type="range" id="size" min="-1" max="1" step="0.01" value="0"></label>
       </div>
 
       <button type="button" class="btn primary vr" id="vr" disabled>Enter VR</button>
@@ -78,10 +85,11 @@
           <div><dt>Trigger</dt><dd>Play or pause</dd></div>
           <div><dt>Grip</dt><dd>Recenter in front of you</dd></div>
           <div><dt>Right stick sideways</dt><dd>Scrub</dd></div>
-          <div><dt>Right stick up and down</dt><dd>Screen size</dd></div>
+          <div><dt>Right stick up and down</dt><dd>3D amount</dd></div>
           <div><dt>Left stick sideways</dt><dd>Next or last clip</dd></div>
+          <div><dt>Left stick up and down</dt><dd>Size</dd></div>
           <div><dt>A</dt><dd>Speed</dd></div>
-          <div><dt>B or Y</dt><dd>Controls</dd></div>
+          <div><dt>B or Y</dt><dd>Controls and 180 or real size</dd></div>
         </dl>
       </div>
     </section>
