@@ -19,6 +19,10 @@ import {
   formatEta,
   sizeFromSlider,
   sliderFromSize,
+  progressiveOrder,
+  chooseTokens,
+  bracket,
+  frameTimes,
 } from '../js/math.js';
 
 test('model size is patch aligned and keeps aspect', () => {
@@ -36,6 +40,21 @@ test('model size is patch aligned and keeps aspect', () => {
     const s = storeSize(m.width, m.height);
     assert.equal(s.width, m.width / 2);
   }
+});
+
+test('model sizes snap to a few shapes so compiled kernels get reused', () => {
+  const shapes = new Set();
+  for (const [w, h] of [[1920, 1080], [1280, 720], [1916, 1080], [720, 1280], [886, 1920], [1080, 1080], [1440, 1080], [2560, 1080]]) {
+    for (const t of [900, 870, 700, 520, 300]) {
+      const m = modelSize(w, h, t);
+      shapes.add(`${m.width}x${m.height}`);
+    }
+  }
+  assert.ok(shapes.size <= 15, `${shapes.size} shapes`);
+  assert.deepEqual(modelSize(1920, 1080, 900), modelSize(1916, 1080, 900));
+  assert.deepEqual(modelSize(1920, 1080, 880), modelSize(1920, 1080, 640));
+  const low = modelSize(720, 1280, 510);
+  assert.ok((low.width / 14) * (low.height / 14) <= 420);
 });
 
 test('half floats round trip', () => {
@@ -126,6 +145,37 @@ test('pixel values are normalized per channel', () => {
   const px = toPixelValues(Uint8ClampedArray.from([255, 0, 128, 255]), 1, 1);
   assert.ok(Math.abs(px[0] - (1 - 0.485) / 0.229) < 1e-5);
   assert.ok(Math.abs(px[1] - (0 - 0.456) / 0.224) < 1e-5);
+});
+
+test('progressive order covers the clip coarse to fine', () => {
+  for (const n of [2, 3, 17, 91, 600]) {
+    const order = progressiveOrder(n);
+    assert.equal(order.length, n);
+    assert.equal(new Set(order).size, n);
+    assert.equal(order[0], 0);
+    assert.equal(order[1], n - 1);
+  }
+  const order = progressiveOrder(91);
+  const firstTen = order.slice(0, 10).sort((a, b) => a - b);
+  const gaps = firstTen.slice(1).map((v, i) => v - firstTen[i]);
+  assert.ok(Math.max(...gaps) <= 32, `gaps ${gaps}`);
+});
+
+test('token choice shrinks only when the budget is tight', () => {
+  assert.equal(chooseTokens(null, 30, 40000), 900);
+  assert.equal(chooseTokens(100, 10, 40000), 900);
+  const t = chooseTokens(800, 30, 40000);
+  assert.ok(t >= 400 && t < 900, `tokens ${t}`);
+  assert.equal(chooseTokens(5000, 120, 40000), 400);
+});
+
+test('bracket finds the two depth frames around a time', () => {
+  const times = [0, 0.5, 1.5, 3];
+  assert.deepEqual(bracket(times, -1), { i0: 0, i1: 0, blend: 0 });
+  assert.deepEqual(bracket(times, 0.25), { i0: 0, i1: 1, blend: 0.5 });
+  assert.deepEqual(bracket(times, 1.5), { i0: 2, i1: 3, blend: 0 });
+  assert.deepEqual(bracket(times, 9), { i0: 3, i1: 3, blend: 0 });
+  assert.deepEqual(frameTimes({ count: 3, fps: 10 }), [0, 0.1, 0.2]);
 });
 
 test('formatting', () => {

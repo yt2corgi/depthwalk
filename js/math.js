@@ -6,9 +6,21 @@ export const SUBJECT = 3.0;
 export const FAR_INV = 1 / 80;
 export const SIZE_BASE = 2.5;
 
+export const ASPECTS = [16 / 9, 4 / 3, 1, 3 / 4, 9 / 16];
+export const TOKEN_LEVELS = [900, 640, 400];
+
+export function snapAspect(aspect) {
+  return ASPECTS.reduce((best, a) => (Math.abs(Math.log(a / aspect)) < Math.abs(Math.log(best / aspect)) ? a : best));
+}
+
+export function snapTokens(tokens) {
+  return TOKEN_LEVELS.find((level) => level <= tokens) ?? TOKEN_LEVELS[TOKEN_LEVELS.length - 1];
+}
+
 export function modelSize(width, height, tokens = 900) {
-  const aspect = width / height;
-  const rows = Math.max(6, Math.round(Math.sqrt(tokens / aspect)));
+  const aspect = snapAspect(width / height);
+  const level = snapTokens(tokens);
+  const rows = Math.max(6, Math.round(Math.sqrt(level / aspect)));
   const cols = Math.max(6, Math.round(rows * aspect));
   return { width: cols * PATCH, height: rows * PATCH };
 }
@@ -262,6 +274,55 @@ export function sizeFromSlider(v) {
 
 export function sliderFromSize(size) {
   return Math.log(size) / Math.log(SIZE_BASE);
+}
+
+export function progressiveOrder(n) {
+  const order = [];
+  const seen = new Uint8Array(n);
+  const add = (i) => {
+    if (i >= 0 && i < n && !seen[i]) {
+      seen[i] = 1;
+      order.push(i);
+    }
+  };
+  add(0);
+  add(n - 1);
+  let step = 1;
+  while (step * 2 < n) step *= 2;
+  for (; step >= 1; step /= 2) {
+    for (let i = 0; i < n; i += step) add(i);
+  }
+  return order;
+}
+
+export function chooseTokens(msPer900, duration, budgetMs, options = {}) {
+  const max = options.max ?? 900;
+  const min = options.min ?? 400;
+  const fps = options.fps ?? 5;
+  if (!msPer900) return max;
+  const want = duration * fps + 1;
+  const tokens = Math.round((max * budgetMs) / (msPer900 * want));
+  return Math.max(min, Math.min(max, tokens));
+}
+
+export function bracket(times, t) {
+  const n = times.length;
+  if (!n || t <= times[0]) return { i0: 0, i1: 0, blend: 0 };
+  if (t >= times[n - 1]) return { i0: n - 1, i1: n - 1, blend: 0 };
+  let lo = 0;
+  let hi = n - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (times[mid] <= t) lo = mid;
+    else hi = mid;
+  }
+  const span = times[hi] - times[lo];
+  return { i0: lo, i1: hi, blend: span > 0 ? (t - times[lo]) / span : 0 };
+}
+
+export function frameTimes(meta) {
+  if (Array.isArray(meta.times) && meta.times.length === meta.count) return meta.times;
+  return Array.from({ length: meta.count }, (_, i) => i / meta.fps);
 }
 
 export function formatTime(seconds) {

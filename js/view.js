@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { depthModel, depthAt, fovFromAspect } from './math.js';
+import { depthModel, depthAt, fovFromAspect, bracket, frameTimes } from './math.js';
 
 const MESH_VERT = `
 uniform sampler2D depthA;
@@ -213,6 +213,7 @@ export class DepthView {
     this.meta = meta;
     this.depth = depth;
     this.video = video;
+    this.times = frameTimes(meta);
     const w = meta.depthW;
     const h = meta.depthH;
     this.plane = w * h;
@@ -340,9 +341,7 @@ export class DepthView {
     const v = this.video;
     const m = this.meta;
     const u = this.uniforms;
-    const f = Math.max(0, (v.currentTime || 0) * m.fps);
-    const i0 = Math.min(m.count - 1, Math.floor(f));
-    const i1 = Math.min(m.count - 1, i0 + 1);
+    const { i0, i1, blend } = bracket(this.times, v.currentTime || 0);
     if (i0 !== this.ia) {
       if (i0 === this.ib) {
         const t = this.texA;
@@ -361,7 +360,7 @@ export class DepthView {
       this.setDepth(this.texB, i1);
       this.ib = i1;
     }
-    u.blend.value = i1 === i0 ? 0 : Math.min(1, f - i0);
+    u.blend.value = i1 === i0 ? 0 : blend;
     if (v.readyState >= 2 && (force || v.currentTime !== this.lastTime || !this.painted)) {
       if (v.paused || !this.painted) this.videoTexture.needsUpdate = true;
       this.painted = true;

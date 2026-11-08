@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { DepthView } from './view.js';
 import { XRMode } from './xr.js';
 import { parseLinks, resolveTweet, pickFormats } from './resolve.js';
-import { prepClip, onModelStatus, Cancelled } from './depth.js';
+import { prepClip, onModelStatus, warmUp, Cancelled } from './depth.js';
 import { formatTime, formatEta, sizeFromSlider, sliderFromSize } from './math.js';
 import * as store from './store.js';
 
@@ -489,7 +489,7 @@ function aiText(s) {
   if (s.phase === 'loading') return `Getting the depth AI ${Math.round((s.progress || 0) * 100)}%`;
   if (s.phase === 'ready') return s.device === 'webgpu' ? 'Depth AI ready · WebGPU' : 'Depth AI ready · no WebGPU so prep is slow';
   if (s.phase === 'error') return 'The depth AI couldn’t load';
-  return 'Depth AI loads when you add a clip';
+  return 'Getting the depth AI ready';
 }
 
 function syncTime() {
@@ -659,3 +659,4 @@ refreshRecent();
 const params = new URLSearchParams(location.search);
 const incoming = params.get('link') || params.get('url') || params.get('text');
 if (incoming) addLinks(incoming);
+setTimeout(warmUp, 600);
