@@ -1,14 +1,12 @@
 import * as THREE from 'three';
-import { DepthView } from './view.js?v=mw8ewdhz';
-import { XRMode } from './xr.js?v=mw8ewdhz';
-import { parseLinks, resolveTweet, pickFormats } from './resolve.js?v=mw8ewdhz';
-import { prepClip, onModelStatus, warmUp, Cancelled } from './depth.js?v=mw8ewdhz';
-import { formatTime, formatEta, sizeFromSlider, sliderFromSize } from './math.js?v=mw8ewdhz';
-import * as store from './store.js?v=mw8ewdhz';
+import { ScreenView } from './view.js?v=mw8f9zl5';
+import { XRMode } from './xr.js?v=mw8f9zl5';
+import { parseLinks, resolveTweet, pickFormats } from './resolve.js?v=mw8f9zl5';
+import { formatTime, sizeFromSlider, sliderFromSize } from './math.js?v=mw8f9zl5';
+import * as store from './store.js?v=mw8f9zl5';
 
 const $ = (id) => document.getElementById(id);
 const ui = {
-  ai: $('ai'),
   form: $('add'),
   link: $('link'),
   paste: $('paste'),
@@ -23,7 +21,6 @@ const ui = {
   play: $('play'),
   time: $('time'),
   speed: $('speed'),
-  strength: $('strength'),
   size: $('size'),
   vr: $('vr'),
   media: $('media'),
@@ -40,14 +37,13 @@ let scrubTo = null;
 let saveTimer = 0;
 let hintTimer = 0;
 let vrReady = false;
-let aiStatus = { phase: 'idle' };
 
 const renderer = new THREE.WebGLRenderer({ canvas: ui.canvas, antialias: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.xr.enabled = true;
-renderer.xr.setFoveation(0.3);
+renderer.xr.setFoveation(0.2);
 
-const view = new DepthView();
+const view = new ScreenView();
 
 const player = {
   togglePlay,
@@ -65,17 +61,11 @@ const player = {
     const v = active && active.video;
     if (v && v.duration) v.currentTime = clamp(f, 0, 1) * Math.max(0, v.duration - 0.05);
   },
-  setStrength(x) {
-    applyTweak(clamp(x, 0, 2), null);
-  },
   setSizeSlider(x) {
-    applyTweak(null, sizeFromSlider(clamp(x, -1, 1)));
-  },
-  nudgeStrength(d) {
-    if (active) applyTweak(clamp(active.meta.strength + d, 0, 2), null);
+    setSize(sizeFromSlider(clamp(x, -1, 1)));
   },
   nudgeSize(d) {
-    if (active) applyTweak(null, clamp(active.meta.size * Math.exp(d), sizeFromSlider(-1), sizeFromSlider(1)));
+    if (active) setSize(clamp(active.meta.size * Math.exp(d), sizeFromSlider(-1), sizeFromSlider(1)));
   },
   onEnterVR() {
     syncControls();
@@ -89,14 +79,14 @@ const player = {
     const v = active && active.video;
     const ready = readyItems();
     const m = active ? active.meta : null;
+    const size = m ? m.size : 1;
     return {
       playing: !!v && !v.paused,
       time: v ? v.currentTime : 0,
       duration: (v && v.duration) || (m && m.duration) || 0,
       speed,
-      strength: m ? m.strength : 1,
-      size: m ? m.size : 1,
-      sizeSlider: sliderFromSize(m ? m.size : 1),
+      size,
+      sizeSlider: sliderFromSize(size),
       index: ready.indexOf(active) + 1,
       total: ready.length,
     };
@@ -155,10 +145,10 @@ function activate(item, play = false) {
   active = item;
   const v = videoFor(item);
   v.playbackRate = speed;
-  view.setClip(item.meta, item.depth, v);
+  view.setClip(item.meta, v);
   view.flash();
   item.meta.openedAt = Date.now();
-  store.update({ key: item.meta.key, openedAt: item.meta.openedAt });
+  store.save(item.meta).then(refreshRecent);
   if (play) playVideo(v);
   syncControls();
   renderQueue();
@@ -192,15 +182,14 @@ function step(dir) {
   activate(next, wasPlaying || xr.active);
 }
 
-function applyTweak(strength, size) {
+function setSize(size) {
   if (!active) return;
   const meta = active.meta;
-  if (strength != null) meta.strength = strength;
-  if (size != null) meta.size = size;
-  view.setTweak(meta.strength, meta.size);
+  meta.size = size;
+  view.setSize(size);
   syncControls();
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => store.update({ key: meta.key, strength: meta.strength, size: meta.size }), 700);
+  saveTimer = setTimeout(() => store.save({ key: meta.key, size: meta.size }), 700);
 }
 
 function hint(text) {
@@ -223,7 +212,7 @@ function addLinks(text) {
       if (existing.status === 'ready') activate(existing);
       continue;
     }
-    items.push({ uid: ++seq, ref, status: 'waiting', progress: 0, eta: null, meta: null, depth: null, video: null });
+    items.push({ uid: ++seq, ref, status: 'waiting', meta: null, video: null });
   }
   renderQueue();
   work();
@@ -247,110 +236,70 @@ async function work() {
 function errorText(e) {
   if (e && e.code === 'novideo') return 'No video in this post';
   if (e && e.code === 'offline') return 'Couldn’t reach X right now';
-  if (e && e.message === 'video') return 'This video wouldn’t load';
-  if (aiStatus.phase === 'error') return 'The depth AI couldn’t load';
-  return 'Depth failed on this clip';
+  return 'This video wouldn’t load';
 }
 
 async function runItem(item) {
   try {
-    const saved = await store.get(item.ref.key);
-    if (saved) {
-      const depth = await store.depth(saved.key);
-      if (depth && depth.length === saved.count * saved.depthW * saved.depthH) {
-        item.meta = saved;
-        item.depth = depth;
-        markReady(item);
-        return;
-      }
-    }
     item.status = 'finding';
     renderItem(item);
-    const info = await resolveTweet(item.ref);
-    const video = info.videos[item.ref.index - 1] || info.videos[0];
-    const formats = pickFormats(video);
-    item.meta = {
-      key: item.ref.key,
-      id: item.ref.id,
-      tweetUrl: info.url || `https://x.com/i/status/${item.ref.id}`,
-      author: info.author,
-      text: (info.text || '').slice(0, 160),
-      thumb: video.thumb,
-      playUrl: formats.play,
-      prepUrl: formats.prep,
-      width: video.width,
-      height: video.height,
-      duration: video.duration,
-      strength: 1,
-      size: 1,
-    };
-    item.status = 'building';
-    item.progress = 0;
-    renderItem(item);
-    const result = await prepClip(item.meta.prepUrl, {
-      onProgress: (p, eta) => {
-        item.progress = p;
-        item.eta = eta;
-        renderItem(item);
-      },
-      throttle: () => xr.active,
-      cancelled: () => !!item.removed,
-    });
+    const saved = await store.get(item.ref.key);
+    if (saved) {
+      item.meta = saved;
+    } else {
+      const info = await resolveTweet(item.ref);
+      const video = info.videos[item.ref.index - 1] || info.videos[0];
+      const formats = pickFormats(video);
+      item.meta = {
+        key: item.ref.key,
+        id: item.ref.id,
+        tweetUrl: info.url || `https://x.com/i/status/${item.ref.id}`,
+        author: info.author,
+        text: (info.text || '').slice(0, 160),
+        thumb: video.thumb,
+        playUrl: formats.play,
+        prepUrl: formats.prep,
+        width: video.width,
+        height: video.height,
+        duration: video.duration,
+        size: 1,
+        savedAt: Date.now(),
+      };
+    }
     if (item.removed) return;
-    Object.assign(item.meta, result.meta, { savedAt: Date.now(), openedAt: Date.now() });
-    item.depth = result.depth;
-    markReady(item);
-    store.save(item.meta, item.depth).then(refreshRecent);
+    item.status = 'ready';
+    if (!active) activate(item);
+    else store.save(item.meta).then(refreshRecent);
+    renderQueue();
+    syncControls();
   } catch (e) {
-    if (e instanceof Cancelled || item.removed) return;
+    if (item.removed) return;
     item.status = 'error';
     item.error = errorText(e);
     renderItem(item);
   }
 }
 
-function markReady(item) {
-  item.status = 'ready';
-  item.progress = 1;
-  if (!active) activate(item);
-  renderQueue();
-  syncControls();
-}
-
 function removeItem(item) {
   item.removed = true;
   const i = items.indexOf(item);
   if (i >= 0) items.splice(i, 1);
+  dropVideo(item);
   if (active === item) {
-    dropVideo(item);
     view.clear();
     active = null;
     const next = readyItems()[0];
     if (next) activate(next);
-  } else {
-    dropVideo(item);
   }
   renderQueue();
   syncControls();
 }
 
 function statusText(item) {
-  switch (item.status) {
-    case 'waiting':
-      return 'Waiting';
-    case 'finding':
-      return 'Finding the video';
-    case 'building':
-      if (aiStatus.phase === 'loading') return `Getting the depth AI ${Math.round((aiStatus.progress || 0) * 100)}%`;
-      if (item.progress <= 0) return 'Starting depth';
-      return `Building depth ${Math.round(item.progress * 100)}%${item.eta ? ` · about ${formatEta(item.eta)}` : ''}`;
-    case 'ready':
-      return `Ready · ${formatTime(item.meta.duration)}`;
-    case 'error':
-      return item.error;
-    default:
-      return '';
-  }
+  if (item.status === 'waiting' || item.status === 'finding') return 'Finding the video';
+  if (item.status === 'ready') return `Ready · ${formatTime(item.meta.duration)}`;
+  if (item.status === 'error') return item.error;
+  return '';
 }
 
 function el(tag, cls, text) {
@@ -381,11 +330,7 @@ function makeRow(onOpen, onRemove, label) {
   const body = el('div', 'body');
   const title = el('div', 'title');
   const sub = el('div', 'sub');
-  const prog = el('div', 'prog');
-  const fill = el('i');
-  prog.append(fill);
-  prog.hidden = true;
-  body.append(title, sub, prog);
+  body.append(title, sub);
   const x = el('button', 'x');
   x.type = 'button';
   x.setAttribute('aria-label', label);
@@ -396,7 +341,7 @@ function makeRow(onOpen, onRemove, label) {
   });
   li.addEventListener('click', onOpen);
   li.append(thumb, body, x);
-  return { li, thumb, title, sub, prog, fill, img: '' };
+  return { li, thumb, title, sub, img: '' };
 }
 
 function setThumb(row, url) {
@@ -427,8 +372,6 @@ function renderItem(item) {
   setThumb(r, item.meta && item.meta.thumb);
   r.title.textContent = item.meta && item.meta.author ? `@${item.meta.author}` : `Post ${item.ref.id.slice(-6)}`;
   r.sub.textContent = statusText(item);
-  r.prog.hidden = item.status !== 'building';
-  r.fill.style.width = `${(item.progress * 100).toFixed(1)}%`;
 }
 
 function renderQueue() {
@@ -437,29 +380,14 @@ function renderQueue() {
   ui.queueEmpty.hidden = items.length > 0;
 }
 
-async function openRecent(meta) {
+function openRecent(meta) {
   const existing = items.find((i) => i.ref.key === meta.key);
   if (existing) {
     if (existing.status === 'ready') activate(existing);
     return;
   }
-  const depth = await store.depth(meta.key);
-  if (!depth || depth.length !== meta.count * meta.depthW * meta.depthH) {
-    hint('That clip’s depth is gone so it will build again');
-    addLinks(meta.tweetUrl || meta.id);
-    return;
-  }
   const [id, index] = meta.key.split('-');
-  const item = {
-    uid: ++seq,
-    ref: { id, user: null, index: +index || 1, key: meta.key },
-    status: 'ready',
-    progress: 1,
-    eta: null,
-    meta,
-    depth,
-    video: null,
-  };
+  const item = { uid: ++seq, ref: { id, user: null, index: +index || 1, key: meta.key }, status: 'ready', meta, video: null };
   items.push(item);
   activate(item);
 }
@@ -478,18 +406,11 @@ async function refreshRecent() {
     r.li.classList.add('ready');
     setThumb(r, meta.thumb);
     r.title.textContent = meta.author ? `@${meta.author}` : `Post ${String(meta.id).slice(-6)}`;
-    r.sub.textContent = `${formatTime(meta.duration)} · depth saved`;
+    r.sub.textContent = formatTime(meta.duration);
     return r.li;
   });
   ui.recent.replaceChildren(...rows);
   ui.recentEmpty.hidden = rows.length > 0;
-}
-
-function aiText(s) {
-  if (s.phase === 'loading') return `Getting the depth AI ${Math.round((s.progress || 0) * 100)}%`;
-  if (s.phase === 'ready') return s.device === 'webgpu' ? 'Depth AI ready · WebGPU' : 'Depth AI ready · no WebGPU so prep is slow';
-  if (s.phase === 'error') return 'The depth AI couldn’t load';
-  return 'Getting the depth AI ready';
 }
 
 function syncTime() {
@@ -497,25 +418,17 @@ function syncTime() {
   ui.time.textContent = v ? `${formatTime(v.currentTime)} / ${formatTime(v.duration || active.meta.duration)}` : '0:00';
 }
 
-function fillRange(input, frac) {
-  input.style.setProperty('--fill', `${(clamp(frac, 0, 1) * 100).toFixed(1)}%`);
-}
-
 function syncControls() {
   const v = active && active.video;
   const playing = !!v && !v.paused;
   ui.play.dataset.playing = playing ? '1' : '0';
-  ui.play.setAttribute('aria-label', playing ? 'Freeze' : 'Play');
+  ui.play.setAttribute('aria-label', playing ? 'Pause' : 'Play');
   ui.play.disabled = !active;
   ui.empty.hidden = !!active;
   for (const b of ui.speed.querySelectorAll('button')) b.classList.toggle('on', +b.dataset.speed === speed);
-  const strength = active ? active.meta.strength : 1;
-  const slider = active ? sliderFromSize(active.meta.size) : 0;
-  if (document.activeElement !== ui.strength) ui.strength.value = String(strength);
+  const slider = active ? sliderFromSize(active.meta.size || 1) : 0;
   if (document.activeElement !== ui.size) ui.size.value = String(slider);
-  fillRange(ui.strength, strength / 2);
-  fillRange(ui.size, (slider + 1) / 2);
-  ui.strength.disabled = !active;
+  ui.size.style.setProperty('--fill', `${(((slider + 1) / 2) * 100).toFixed(1)}%`);
   ui.size.disabled = !active;
   if (!vrReady) {
     ui.vr.disabled = true;
@@ -568,14 +481,12 @@ ui.speed.addEventListener('click', (e) => {
   if (b) setSpeed(+b.dataset.speed);
 });
 
-ui.strength.addEventListener('input', () => player.setStrength(+ui.strength.value));
 ui.size.addEventListener('input', () => player.setSizeSlider(+ui.size.value));
 
 ui.vr.addEventListener('click', async () => {
   if (!active || xr.active) return;
   const entering = xr.enter();
-  const v = videoFor(active);
-  playVideo(v);
+  playVideo(videoFor(active));
   try {
     await entering;
   } catch {
@@ -584,31 +495,7 @@ ui.vr.addEventListener('click', async () => {
   syncControls();
 });
 
-let drag = null;
-ui.canvas.addEventListener('pointerdown', (e) => {
-  drag = { x: e.clientX, y: e.clientY };
-  ui.canvas.setPointerCapture(e.pointerId);
-});
-ui.canvas.addEventListener('pointermove', (e) => {
-  if (!drag) return;
-  const r = ui.canvas.getBoundingClientRect();
-  view.previewDrag((e.clientX - drag.x) / r.width, (e.clientY - drag.y) / r.height);
-  drag = { x: e.clientX, y: e.clientY };
-});
-const endDrag = () => {
-  drag = null;
-};
-ui.canvas.addEventListener('pointerup', endDrag);
-ui.canvas.addEventListener('pointercancel', endDrag);
-ui.canvas.addEventListener(
-  'wheel',
-  (e) => {
-    e.preventDefault();
-    view.previewZoom(e.deltaY);
-  },
-  { passive: false },
-);
-ui.canvas.addEventListener('dblclick', () => view.previewReset());
+ui.canvas.addEventListener('click', togglePlay);
 
 document.addEventListener('keydown', (e) => {
   if (e.target === ui.link) return;
@@ -619,12 +506,6 @@ document.addEventListener('keydown', (e) => {
 });
 
 new ResizeObserver(resize).observe(ui.stage);
-
-onModelStatus((s) => {
-  aiStatus = s;
-  ui.ai.textContent = aiText(s);
-  for (const item of items) if (item.status === 'building') renderItem(item);
-});
 
 XRMode.supported().then((ok) => {
   vrReady = ok;
@@ -638,7 +519,6 @@ renderer.setAnimationLoop((t, frame) => {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
   if (xr.active) xr.frame(dt, frame);
-  else view.updatePreview(dt);
   const v = active && active.video;
   if (scrubTo != null && v && !v.seeking && Math.abs(v.currentTime - scrubTo) > 0.03) v.currentTime = scrubTo;
   view.update();
@@ -659,4 +539,3 @@ refreshRecent();
 const params = new URLSearchParams(location.search);
 const incoming = params.get('link') || params.get('url') || params.get('text');
 if (incoming) addLinks(incoming);
-setTimeout(warmUp, 600);

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { formatTime } from './math.js?v=mw8ewdhz';
+import { formatTime } from './math.js?v=mw8f9zl5';
 
 const W = 1280;
 const H = 400;
@@ -11,8 +11,7 @@ const REGIONS = [
   { id: 'last', x: 40, y: 200, w: 170, h: 160 },
   { id: 'next', x: 226, y: 200, w: 170, h: 160 },
   { id: 'speed', x: 412, y: 200, w: 170, h: 160 },
-  { id: 'depth', x: 598, y: 200, w: 260, h: 160, slider: true },
-  { id: 'size', x: 874, y: 200, w: 200, h: 160, slider: true },
+  { id: 'size', x: 598, y: 200, w: 476, h: 160, slider: true },
   { id: 'exit', x: 1090, y: 200, w: 150, h: 160 },
 ];
 
@@ -93,7 +92,6 @@ export class Bar {
       Math.floor(s.time * 4),
       Math.round(s.duration),
       s.speed,
-      Math.round(s.strength * 50),
       Math.round(s.sizeSlider * 50),
       s.index,
       s.total,
@@ -191,8 +189,7 @@ export class Bar {
     cell('last', 'Last', s.total > 1 ? `${s.index} of ${s.total}` : '');
     cell('next', 'Next', s.total > 1 ? `${s.index} of ${s.total}` : '');
     cell('speed', `${s.speed}x`, 'Speed');
-    slider('depth', 'Depth', s.strength / 2, `${Math.round(s.strength * 100)}`);
-    slider('size', 'Size', (s.sizeSlider + 1) / 2, `${Math.round(s.size * 100)}`);
+    slider('size', 'Screen size', (s.sizeSlider + 1) / 2, `${Math.round(s.size * 100)}`);
     cell('exit', 'Exit', '');
     this.texture.needsUpdate = true;
   }

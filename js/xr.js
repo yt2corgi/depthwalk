@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
-import { Bar } from './bar.js?v=mw8ewdhz';
+import { Bar } from './bar.js?v=mw8f9zl5';
 
 const GROW_SECONDS = 2.6;
 const START_SCALE = 0.04;
@@ -90,7 +90,7 @@ export class XRMode {
     this.anchor = null;
     this.grow = 0;
     this.view.world.scale.setScalar(START_SCALE);
-    this.view.bleedLevel = 0;
+    this.view.glowLevel = 0;
     this.view.fade = 0;
     this.view.fadeTarget = 1;
     session.addEventListener('end', () => {
@@ -144,7 +144,7 @@ export class XRMode {
     w.position.set(a.pos.x + fx * ahead, a.pos.y - 0.12 * (1 - e), a.pos.z + fz * ahead);
     w.rotation.set(0, a.yaw, 0);
     w.scale.setScalar(Math.exp(Math.log(START_SCALE) * (1 - e)));
-    this.view.bleedLevel = e * e;
+    this.view.glowLevel = e * e;
   }
 
   recenter() {
@@ -190,7 +190,7 @@ export class XRMode {
     } else {
       this.player.endScrub();
       if (Math.abs(ry) > 0.3) {
-        this.player.nudgeStrength(-ry * dt * 0.9);
+        this.player.nudgeSize(-ry * dt * 0.8);
         this.showBar();
       }
     }
@@ -202,10 +202,6 @@ export class XRMode {
       this.showBar();
     }
     if (Math.abs(lx) < 0.3) this.flickArmed = true;
-    if (Math.abs(ly) > 0.3 && Math.abs(ly) > Math.abs(lx)) {
-      this.player.nudgeSize(-ly * dt * 0.8);
-      this.showBar();
-    }
   }
 
   press(slot, index, down, up) {
@@ -239,7 +235,6 @@ export class XRMode {
         this.player.togglePlay();
         break;
       case 'track':
-      case 'depth':
       case 'size':
         this.dragging = hit.id;
         this.slide(hit);
@@ -264,7 +259,6 @@ export class XRMode {
   slide(hit) {
     if (hit.frac == null) return;
     if (hit.id === 'track') this.player.seekFraction(hit.frac);
-    else if (hit.id === 'depth') this.player.setStrength(hit.frac * 2);
     else if (hit.id === 'size') this.player.setSizeSlider(hit.frac * 2 - 1);
   }
 
