@@ -62,7 +62,7 @@ varying vec2 vFar;
 void main() {
   vec3 c = texture2D(map, vUv).rgb;
   vec3 s = texture2D(soft, clamp(vUv + vFar * 0.035, 0.0, 1.0)).rgb;
-  c = mix(c, s * 0.82, clamp(vEdge * edgeFill, 0.0, 1.0));
+  c = mix(c, s * 0.55, clamp(vEdge * edgeFill, 0.0, 1.0));
   float e = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
   float border = smoothstep(0.0, 0.03, e);
   vec3 b = texture2D(bleed, vUv).rgb * bleedGain;

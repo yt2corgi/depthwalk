@@ -8,7 +8,7 @@ import {
   fromHalfArray,
 } from './math.js';
 
-const TRANSFORMERS = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/dist/transformers.min.js';
+const TRANSFORMERS = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0/dist/transformers.min.js';
 const MODEL = 'onnx-community/depth-anything-v2-base';
 const TOKENS = 900;
 const FPS = 10;
