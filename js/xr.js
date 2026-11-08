@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
-import { Bar } from './bar.js';
+import { Bar } from './bar.js?v=mw8ewdhz';
 
 const GROW_SECONDS = 2.6;
 const START_SCALE = 0.04;

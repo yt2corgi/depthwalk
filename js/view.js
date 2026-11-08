@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { depthModel, depthAt, fovFromAspect, bracket, frameTimes } from './math.js';
+import { depthModel, depthAt, fovFromAspect, bracket, frameTimes } from './math.js?v=mw8ewdhz';
 
 const MESH_VERT = `
 uniform sampler2D depthA;

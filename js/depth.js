@@ -8,7 +8,7 @@ import {
   fromHalfArray,
   progressiveOrder,
   chooseTokens,
-} from './math.js';
+} from './math.js?v=mw8ewdhz';
 
 const TRANSFORMERS = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0/dist/transformers.min.js';
 const MODEL = 'onnx-community/depth-anything-v2-base';

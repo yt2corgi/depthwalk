@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { formatTime } from './math.js';
+import { formatTime } from './math.js?v=mw8ewdhz';
 
 const W = 1280;
 const H = 400;

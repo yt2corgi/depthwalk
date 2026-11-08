@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { DepthView } from './view.js';
-import { XRMode } from './xr.js';
-import { parseLinks, resolveTweet, pickFormats } from './resolve.js';
-import { prepClip, onModelStatus, warmUp, Cancelled } from './depth.js';
-import { formatTime, formatEta, sizeFromSlider, sliderFromSize } from './math.js';
-import * as store from './store.js';
+import { DepthView } from './view.js?v=mw8ewdhz';
+import { XRMode } from './xr.js?v=mw8ewdhz';
+import { parseLinks, resolveTweet, pickFormats } from './resolve.js?v=mw8ewdhz';
+import { prepClip, onModelStatus, warmUp, Cancelled } from './depth.js?v=mw8ewdhz';
+import { formatTime, formatEta, sizeFromSlider, sliderFromSize } from './math.js?v=mw8ewdhz';
+import * as store from './store.js?v=mw8ewdhz';
 
 const $ = (id) => document.getElementById(id);
 const ui = {
